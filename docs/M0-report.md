@@ -43,7 +43,7 @@ Remotion 4.0.541 + `@remotion/three` + R3F 9 + `postprocessing` 6 跑通；同�
 ## 5. 耗时（每帧，本机 SwiftShader CPU）
 
 - 无模糊：约 0.25 秒/帧
-- 8 子帧：约 1.5 秒（约 6 倍，不到 8 倍是因为后期只做一次）/帧
+- 8 子帧：约 1.5 秒/帧（约 6 倍；不到 8 倍是因为后期只做一次）
 
 这是**无 GPU 的软件渲染**，只说明链路可行，不代表 M 系列 Mac 的速度。按经验，GPU（ANGLE/Metal）比 SwiftShader 快一个数量级以上；M1 的"≤20 秒"目标需要在你的 Mac 上实测（M3 的 `doctor.mjs` 会给出单帧耗时）。
 
