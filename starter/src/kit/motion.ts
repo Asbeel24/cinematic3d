@@ -69,3 +69,48 @@ export function progress(t: number, from: number, to: number, e: Ease = ease.cin
 }
 
 export const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
+
+/** Smooth 3D value noise in [-1,1]. */
+export function noise3D(x: number, y: number, z: number, seed = 0): number {
+  const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+  const xf = x - xi, yf = y - yi, zf = z - zi;
+  const s = (v: number) => v * v * (3 - 2 * v);
+  const u = s(xf), v = s(yf), w = s(zf);
+  const h = (a: number, b: number, c: number) =>
+    hash1(a * 73856093 ^ b * 19349663 ^ c * 83492791, seed) * 2 - 1;
+  const l = (a: number, b: number, k: number) => a + (b - a) * k;
+  return l(
+    l(l(h(xi, yi, zi), h(xi + 1, yi, zi), u), l(h(xi, yi + 1, zi), h(xi + 1, yi + 1, zi), u), v),
+    l(l(h(xi, yi, zi + 1), h(xi + 1, yi, zi + 1), u), l(h(xi, yi + 1, zi + 1), h(xi + 1, yi + 1, zi + 1), u), v),
+    w,
+  );
+}
+
+export type SpringOpts = {
+  /** frame the spring starts */
+  start?: number;
+  /** frames until it is visually settled (≈2% band) */
+  settle?: number;
+  /** peak overshoot as a fraction, default 0.015 (1.5%). Jelly type may use more. */
+  overshoot?: number;
+};
+
+/**
+ * Analytic under-damped spring 0 → 1, a pure function of t (frames).
+ * Damping ratio is derived from the desired overshoot.
+ */
+export function springAt(t: number, { start = 0, settle = 24, overshoot = 0.015 }: SpringOpts = {}) {
+  const tau = t - start;
+  if (tau <= 0) return 0;
+  const os = Math.min(0.9, Math.max(1e-4, overshoot));
+  const lnos = Math.log(os);
+  const zeta = -lnos / Math.sqrt(Math.PI * Math.PI + lnos * lnos);
+  // settle time (2%) ≈ 4 / (zeta * wn)
+  const wn = 4 / (zeta * settle);
+  const wd = wn * Math.sqrt(1 - zeta * zeta);
+  const e = Math.exp(-zeta * wn * tau);
+  return 1 - e * (Math.cos(wd * tau) + (zeta / Math.sqrt(1 - zeta * zeta)) * Math.sin(wd * tau));
+}
+
+/** Seconds → frames helper. */
+export const sec = (s: number, fps: number) => Math.round(s * fps);
