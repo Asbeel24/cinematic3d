@@ -8,7 +8,9 @@
 | `Not inside a cinematic-3d shot project` | 不在镜头工程目录里 | `cd <name>`；或先 `new.mjs` |
 | `Cannot find module '@remotion/...'` | 依赖没装 | 在 `<skill>/starter` 里 `npm install`，再 `new.mjs`（会链接依赖）；或在工程里 `npm install` |
 | 卡在下载 Chrome / `ENOTFOUND remotion.media` | 第一次运行要联网下载 Chrome Headless Shell | 联网重试；离线设 `CINE_BROWSER=/path/to/chrome-headless-shell` |
-| 全黑帧、`mean 0.000` | WebGL 没起来 | 换后端：Mac `CINE_GL=angle`，Linux 无 GPU `CINE_GL=swangle`，Linux GPU `CINE_GL=angle-egl` |
+| 全黑帧、`mean 0.000` | WebGL 没起来 | 换后端：Mac `CINE_GL=angle`，Linux 无 GPU `CINE_GL=swangle`，Linux GPU `CINE_GL=angle-egl`。先跑 doctor：它的 test render PASS 说明后端没问题，问题在场景里（见下一行） |
+| 全黑或几乎全黑、doctor 却正常 | 某个几何体有 NaN 顶点 | stills 会打印 `WARNING: geometry produced NaN`；查 `Math.pow(负数, 小数)`、`sqrt(负数)`、`0/0`，把参数夹到合法范围 |
+| `Timed out evaluating page function` | 机器太忙 | stills 已自动重试一次；还超时就别同时跑别的渲染 |
 | 渲染非常慢 | 用了 CPU 软渲染 | Mac 上不要设 `CINE_GL`；看 doctor 的 speed 项 |
 | `No space left on device` | 正式渲染的临时帧占空间 | 清掉旧的 `out/`、`review/` |
 
@@ -25,6 +27,8 @@
 | 合成 id 找不到 | `shot.config.ts` 的 `name` 改过 | 合成 id = `<name>-9x16`；`--comp` 用新名字 |
 | 黑色方块 / 物体看不见 | 法线反了或 `side` 不对 | `lathe` 轮廓从下往上写；平面用 `side={THREE.DoubleSide}` |
 | 毛长到物体里面 | 法线朝内 | 同上，轮廓点顺序反过来 |
+| 表盘 / 标签上有闪烁的碎块 | 两个面重合（z-fighting） | 贴花离开底面 0.2–0.5 mm |
+| 圆面朝上而不是朝镜头 | `lathe` / `cylinder` 的轴是 +y | `faceZ(geometry)` |
 
 ## 画面
 | 症状 | 修法 |
@@ -40,7 +44,14 @@
 | 白色产品像肥皂 | 加分缝线、脚垫、指示灯、不同粗糙度的面板 |
 | 物体漂浮 | 底部 `y` 对齐地面；有 `castShadow` 和地面 `receiveShadow` |
 | 字被平台 UI 挡住 | 看联系表上的青色线；`Caption place` 或机位调整 |
+| 主体太小 / 太大 / 偏到安全区外 | 用 `useShot({ frame })` 自动取景，调 `fill` |
+| 粒子 / 蒸汽在台灯下不亮 | 放在 `<KeyLight>` 里，`aperture` 放在灯罩口；不要加 gobo |
+| 台灯近处的物体没有阴影 | 已自动处理（阴影近平面随灯距缩小）；仍没有就把灯抬高到 0.4 m 以上 |
 | 文字贴图被拉伸 | 用"虚拟宽画布"（见 materials.md） |
+| 地面上一条细横线（浅景深） | 对焦平面和地面相交处那一窄条是清楚的，正常现象，不用修 |
+| 分屏标签中途从上跳到下 | 已修（每个标签整条镜头只选一次行）；想固定用 `rows={[undefined, 0.66, undefined]}` |
+| 单个主体漂出白模 / 线框带 | 分割线方向要跟环绕方向一致，见 looks/render-pass.md |
+| 玻璃瓶里的液体发黑 | 瓶身用 `glassShell()`，液体用 `jelly()`，不要两层透射 |
 | 颗粒太重 / 文件太大 | `film.grain` 0.35 → 0.2 |
 | 快速运动有频闪感 | 加 `useMotionBlur(from, to, 8)` |
 

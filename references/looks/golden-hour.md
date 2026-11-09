@@ -56,7 +56,12 @@
 | 前景虚化更强 | `focus.aperture` 2.8 → 2.0 |
 | 换桌上的东西 | 换 `RecordPlayer` / `Gaiwan` 组件，保持在光束照得到的区域（x -0.5–0.2，z -0.3–0.35） |
 
+## 变体：深夜台灯
+把窗光换成台灯：见 `references/light.md` 的"实景光源"。保留桌面、`Steam`，删掉 `Beam` 和百叶相关的东西，窗外换夜景（楼房灯光用 `emissive`）。
+
 ## 换主体时
+- 主体比唱机小（书、眼镜、杯子、相机）时，参考机位会让主体只占画面 10% 左右：用 `useShot({ lens: 35, frame: { center, size, fill: 0.35, elevation: 25 } })` 重新取景，`center` / `size` 取所有桌上物件合起来的包围盒。
+- 删掉不用的组件（`RecordPlayer`、`Gaiwan`、`Steam`）时，相关的 import 留着也不影响渲染。
 - 新物体放在桌面 `y = 0`，在窗光照到的条带里，否则没有百叶影。
 - 有热饮就保留 `Steam`，把 `origin` 移到杯口。
 - 前景物体就是对焦点，`focus.point` 跟着移。

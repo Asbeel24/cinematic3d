@@ -23,6 +23,9 @@ export const RENDERPASS = {
   /** band seams at start and end (0..1 across the frame diagonal) */
   seamsFrom: [0.43, 0.6],
   seamsTo: [0.37, 0.54],
+  clayColor: "#b9b4ab",
+  wireColor: "#bcd8ff",
+  wireBackground: "#24324a",
 };
 const R = RENDERPASS;
 
@@ -34,9 +37,9 @@ export const makeSplitSpec = (frames: number): SplitSpec => ({
     const k = progress(t, 0, frames - 1, ease.inOut);
     return [lerp(R.seamsFrom[0], R.seamsTo[0], k), lerp(R.seamsFrom[1], R.seamsTo[1], k)];
   },
-  clayColor: "#b9b4ab",
-  wireColor: "#bcd8ff",
-  wireBackground: "#24324a",
+  clayColor: R.clayColor,
+  wireColor: R.wireColor,
+  wireBackground: R.wireBackground,
 });
 
 /* ------------------------------ props ------------------------------ */

@@ -1,9 +1,10 @@
 import React, { useMemo, useRef } from "react";
 import * as THREE from "three";
+import { useVideoConfig } from "remotion";
 import { FontLoader } from "three/examples/jsm/loaders/FontLoader.js";
 import { TextGeometry } from "three/examples/jsm/geometries/TextGeometry.js";
 import { Fog, Stage, useMotionBlur, useTimeline } from "../../kit/stage";
-import { shot, useShot } from "../../kit/camera";
+import { frameSubject, shot, useShot, type Vec3 } from "../../kit/camera";
 import { Bounce, KeyLight, SkyFill, StudioEnv } from "../../kit/lights";
 import { ease } from "../../kit/motion";
 import { jelly } from "../../kit/materials";
@@ -69,6 +70,14 @@ function letterPose(t: number, hit: number) {
   const sy = 1 - J.squash * decay * Math.cos(w * d);
   const hop = 0.035 * Math.exp(-d / 5) * Math.max(0, Math.sin(w * d));
   return { y: hop, sy, sx: 1 / Math.sqrt(sy), rz: 0.06 * decay * Math.sin(w * d * 0.5), visible: true };
+}
+
+/** Width of the laid-out word in metres (same advance rule as <Letters>). */
+function wordWidth() {
+  return Array.from(J.word).reduce((w, ch) => {
+    const glyph = (fredoka as { glyphs: Record<string, { ha: number }> }).glyphs[ch];
+    return w + ((glyph?.ha ?? 600) / 1000) * J.size * 1.18;
+  }, 0);
 }
 
 const Letters: React.FC = () => {
@@ -147,13 +156,31 @@ const Sweep: React.FC = () => {
 };
 
 const Shot: React.FC = () => {
+  const { width, height } = useVideoConfig();
+  // frame the settled word: any length fits the safe area; the push ends on this framing
+  const end = frameSubject(
+    { center: [0, J.size * 0.55, 0], size: [wordWidth(), J.size * 1.1, J.size * 0.6], fill: 0.11, elevation: 1.5 },
+    50,
+    width / height,
+  );
+  const PUSH = 0.14; // start 14 % further away, push in to `end`
+  return (
+    <ShotCamera
+      position={end.position.map((v, i) => v + (end.position[i] - end.target[i]) * PUSH) as Vec3}
+      target={end.target}
+      push={end.position}
+    />
+  );
+};
+
+const ShotCamera: React.FC<{ position: Vec3; target: Vec3; push: Vec3 }> = ({ position, target, push }) => {
   useShot({
     lens: 50,
-    position: [0, 0.06, 1.45],
-    target: [0, 0.09, 0],
-    move: shot.push([0, 0.055, 1.25], { ease: ease.inOut }),
+    position,
+    target,
+    move: shot.push(push, { ease: ease.inOut }),
     drift: { px: 2, seed: 2 },
-    focus: { point: [0, 0.07, 0.03], aperture: 2.8 },
+    focus: { point: [target[0], J.size * 0.6, 0.03], aperture: 2.8 },
   });
   return null;
 };

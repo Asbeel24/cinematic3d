@@ -100,11 +100,23 @@ import { FONTS } from "../kit/fonts";            // 画布文字用的字体名
 在组件里调用一次（组件返回 `null`）。
 | 字段 | 说明 |
 | --- | --- |
-| `lens` | `35 \| 50 \| 85`（mm）。竖屏按 36 mm 片幅高、横屏按 24 mm 换算 FOV |
-| `position` / `target` | 起始机位、注视点（米） |
+| `lens` | `35 \| 50 \| 85`（mm）。竖屏按 36 mm 片幅高换算 FOV，横屏和 1:1 按 24 mm |
+| `frame` | **自动取景**：`{ center, size, fill = 0.42, elevation = 15, azimuth = 0 }`，见下。给了它就不用 `position` / `target` |
+| `position` / `target` | 起始机位、注视点（米），不用 `frame` 时必填 |
 | `move` | 主运动，见 `shot.*`，默认 `static` |
 | `drift` | `{ px = 3, seed }` 手持漂移（输出像素），`false` 锁死 |
-| `focus` | `{ point?, distance?, aperture = 2.8 }` 物理景深；`false` 关闭。`point` 默认等于 `target` |
+| `focus` | `{ point?, distance?, aperture = 2.8 }` 物理景深；`false` 或**不写**都是关闭。`point` 默认等于 `target` |
+
+### 自动取景 `frame`
+```ts
+useShot({ lens: 85, frame: { center: [0, 0.145, 0], size: [0.05, 0.05, 0.03], fill: 0.4, elevation: 12 }, move: shot.dolly(0.03) })
+```
+- `center` / `size`：主体（或几个主体合起来）的包围盒中心和尺寸 `[宽, 高, 深]`，米。转动的产品用它转动时最宽的尺寸。
+- `fill`：主体占画面高度的比例。0.3 有环境，0.42 默认，0.55 很满。
+- `elevation`：俯视角（度）。0 平视，12–15 产品，25–35 桌面。`azimuth`：从右侧绕过去的角度（度）。
+- 竖屏 9:16 时自动把主体放在平台安全区的中心（不是画面正中）；主体宽度不超过画面宽度的 70%。
+- 和它一起用相对运动：`shot.dolly(距离的 5–15%)`、`shot.orbit(deg)`、`shot.crane(dy)`。`push(to)` 需要绝对坐标，不适合。
+- `frameSubject(frame, lens, aspect)` 返回 `{ position, target, distance }`，需要绝对坐标时用。
 
 ### `shot.*`（每个都接受 `{ start?, end?, ease? }`，默认整条镜头、`ease.cine`）
 | 构造 | 含义 |
@@ -135,6 +147,7 @@ import { FONTS } from "../kit/fonts";            // 画布文字用的字体名
 | `angle` | 锥半角（度）。默认 sun 9 / softbox 50 / spot 25 |
 | `shadowRadius` | 阴影柔化（texel）。默认 sun 3 / softbox 12 / spot 4 |
 | `shadowMapSize` | 默认 2048 |
+| `penumbra` | 光锥边缘柔度 0–1（默认 sun 0.05 / softbox 1 / spot 0.35）。带 gobo 时不起作用，边缘由 gobo 的 `softness` 决定 |
 | `children` | `<Beam>` / `<Dust>` / `<Steam>` 必须放在里面 |
 
 `GoboSpec`：`{ pattern: "blinds" | "window" | "leaves", slats?, open? (0–1 透光比例), angle? (度), softness? (px/1024), bars? (防盗网竖杆数), aperture? [x0,y0,x1,y1], seed? }`
@@ -148,6 +161,8 @@ import { FONTS } from "../kit/fonts";            // 画布文字用的字体名
 ### `<StudioEnv intensity? rotationY? />`
 程序化棚拍环境反射（RoomEnvironment），默认 0.4。窗边室内场景用 0.03–0.1，产品棚拍用 0.3–0.6。
 
+主光离被照物很近时（台灯 0.5 m），阴影相机的近平面会自动缩小，近处物体照样有阴影。
+
 ### `<Beam aperture floorY haze? steps? near? />`
 体积光束（光线步进，跟随 gobo）。`aperture` 是光进入的开口四角（世界坐标，如窗洞），`floorY` 光束止于的高度。`haze` 0–1，默认 0.5。`near` 相机前多少米不加雾（默认 0.6）。
 
@@ -156,6 +171,9 @@ import { FONTS } from "../kit/fonts";            // 画布文字用的字体名
 ---
 
 ## particles.tsx（都要放在 `<KeyLight>` 里，只在光束里亮）
+
+"光束"就是主光的光锥：有 gobo 时按 gobo 图案亮，没有 gobo 时按一个柔和的圆锥亮。
+`aperture` 是一个四边形开口（世界坐标四个角），粒子只在开口靠房间一侧亮：窗光用窗洞四角；台灯这类光源用灯罩口附近、垂直于光线的一个小方框。
 
 ### `<Dust aperture floorY min max count? size? gain? seed? />`
 灰尘点，`min/max` 是分布的盒子。默认 1500 颗、1.6 mm、gain 1。
@@ -173,7 +191,8 @@ import { FONTS } from "../kit/fonts";            // 画布文字用的字体名
 | `chrome(roughness = 0.08)` | 镜面铬 |
 | `metal(color, roughness = 0.32)` | 拉丝 / 缎面金属 |
 | `plastic(color, roughness = 0.42)` | 塑料（带一点清漆） |
-| `glass(tint = "#ffffff", roughness = 0.04)` | 透射玻璃 |
+| `glass(tint = "#ffffff", roughness = 0.04)` | 透射玻璃（空容器） |
+| `glassShell(envIntensity = 2.5)` | 有内容物的玻璃外壳：只有反射和清漆高光，加法混合、不写深度，里面的东西照常可见。内容物用 `jelly()` |
 | `jelly(color, size = 0.1)` | 果冻 / 软糖：透射 + 衰减色 + 清漆，`size` 是物体厚度 |
 | `paper(color)` | 纸、卡片 |
 | `wood({ seed, light, dark, repeat, roughness })` | 程序化木纹 |
@@ -204,6 +223,14 @@ import { FONTS } from "../kit/fonts";            // 画布文字用的字体名
 | `smoothProfile(ctrl: [r, y][], samples = 48)` | 少量控制点 → 平滑轮廓，配合 `lathe` |
 | `wallWithHole(w, h, { x, y, w, h }, depth = 0.12)` | 带窗洞的墙 |
 | `slatPositions(count, top, bottom)` | 百叶片高度列表 |
+| `rod(a, b, r = 0.002, seg = 16)` | 两点之间的圆杆（眼镜腿、线缆、桌腿）。几何已经放在世界坐标，mesh 不要再设位置 |
+| `ring(rOuter, rInner, depth, seg = 96)` | 扁圆环（表圈、表带环、镜框），轴向 +y |
+| `torus(R, r, arc = 2π)` | 圆环管（杯把、圆框），轴向 +z |
+| `bentSheet(w, d, lift = 0.01)` | 中间拱起的薄片（书页、纸、布），平躺在 y = 0，带 UV |
+| `faceZ(geometry)` | 把轴向 +y 的几何（lathe、cylinder、ring）转成轴向 +z，正面朝镜头 |
+
+`lathe` / `cylinder` / `ring` 的轴都是 +y（立着）。要让圆面朝镜头（表盘、镜头、喇叭）就 `faceZ(...)`。
+贴在另一个面上的薄片（表盘印字、贴纸、标签）要离开那个面 0.2–0.5 mm，否则两个面重合会闪（z-fighting）。
 
 物体底面放在 `y = 0`，桌面 / 地面也是 `y = 0`。接触面要贴实，不要悬空。
 
@@ -252,7 +279,9 @@ import { FONTS } from "../kit/fonts";            // 画布文字用的字体名
 `seams(t) => number[]` 返回分割位置（0–1）。物体加 `userData={{ noWire: true }}` 时不出现在线框带里（墙、桌子）。
 
 ### `<PassLabels spec labels? rows? />`
-每条带的 DOM 标签，放在 `<Stage>` 外层。`makeSplitSpec(frames)` 见 render-pass 场景。
+每条带的 DOM 标签，放在 `<Stage>` 外层。默认自动把每个标签放在画面上沿或下沿（哪边露出的带更宽就放哪边），避开画面中心的主体。
+`rows` 可以手动给每个标签的高度（0–1），一般不需要。`makeSplitSpec(frames)` 见 render-pass 场景。
+标签可以写中文：字体会回退到系统中文字体（苹方、思源黑体等），skill 本身不带中文字体。
 
 ---
 
@@ -268,7 +297,9 @@ import { FONTS } from "../kit/fonts";            // 画布文字用的字体名
 | `color` / `rootColor` | | 毛尖色 / 根部色（自阴影） |
 | `thickness` | 0.85 | 毛根粗细（格子比例） |
 | `gravity` | 0.35 | 毛尖下垂（毛长的比例） |
-| `wind` | `{ strength: .25, dir: [1,0,.3], speed: 1 }` | 风，随帧号缓慢起伏 |
+| `wind` | `{ strength: .25, dir: [1,0,.3], speed: 1, gust? }` | 风。默认按时间缓慢"呼吸"（strength × 0.65±0.35，`speed` 调呼吸快慢）。`gust: (秒) => 倍数` 时改用你的包络 |
+
+阵风（"一阵一阵"）：`import { Fur, gusts } from "../kit/fur"`，`wind={{ strength: 0.4, dir: [1,0.15,0.4], gust: gusts({ at: [1, 2, 4], base: 0.25, peak: 1.2 }) }}`。快起慢落；阵风点放在整秒或节拍上。
 
 ---
 

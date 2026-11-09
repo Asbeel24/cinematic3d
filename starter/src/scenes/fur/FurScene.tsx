@@ -133,10 +133,10 @@ const Shot: React.FC = () => {
   useShot({
     lens: 85,
     position: [0.12, 0.17, 0.86],
-    target: [0.06, 0.065, 0.02],
+    target: [0.06, 0.075, 0.02],
     move: shot.dolly(0.1, { ease: ease.inOut }),
     drift: { px: 2, seed: 5 },
-    focus: { point: [0.075, 0.06, 0.06], aperture: 2.8 },
+    focus: { point: [0.1, 0.05, 0.075], aperture: 2.8 },
   });
   return null;
 };

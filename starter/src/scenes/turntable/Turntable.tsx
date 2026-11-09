@@ -20,10 +20,12 @@ export const TURNTABLE = {
   panelColor: "#d9d5cc",
   knobColors: ["#e2572b", "#e2572b", "#2b2b2b", "#2b2b2b", "#f0b429", "#2b2b2b"],
   keyTemp: 4300,
+  /** wall bounce colour temperature (keep ≥ 2000 K away from keyTemp) */
+  bounceTemp: 6500,
   /** degrees the product turns over the shot */
   turn: 70,
-  /** when the product faces the camera straight on, as a fraction of the shot (0.62 ≈ 3.7 s of 6 s) */
-  frontAt: 0.62,
+  /** second at which the product faces the camera straight on (rotation 0) */
+  frontSec: 3.7,
   background: "#302c28",
   /** do not edit */
   plinthR: 0.25,
@@ -194,11 +196,12 @@ const stone = () => {
 const Product: React.FC = () => {
   const turn = useRef<THREE.Group>(null!);
   const stoneMat = useMemo(stone, []);
-  const { durationInFrames } = useVideoConfig();
+  const { durationInFrames, fps } = useVideoConfig();
+  const kFront = ease.inOut(Math.min(1, (T.frontSec * fps) / (durationInFrames - 1)));
   useTimeline((t) => {
     const k = progress(t, 0, durationInFrames - 1, ease.inOut);
-    // rotation 0 = front faces the camera (+z); it happens at frontAt of the shot
-    turn.current.rotation.y = THREE.MathUtils.degToRad(T.turn * (k - ease.inOut(T.frontAt)));
+    // rotation 0 = front faces the camera (+z); it happens at frontSec
+    turn.current.rotation.y = THREE.MathUtils.degToRad(T.turn * (k - kFront));
   });
   return (
     <group>
@@ -259,7 +262,7 @@ export const Turntable: React.FC<{ durationInFrames: number }> = () => (
     <Shot />
     <Fog color={T.background} near={1.8} far={4.2} />
     <KeyLight kind="softbox" temp={T.keyTemp} intensity={6.5} position={[-1.2, 1.8, 1.0]} target={[0, 0.12, 0]} angle={28} shadowRadius={10} />
-    <Bounce from="wall" temp={6500} intensity={0.5} position={[1.5, 0.4, 0.8]} />
+    <Bounce from="wall" temp={T.bounceTemp} intensity={0.5} position={[1.5, 0.4, 0.8]} />
     <SkyFill temp={8500} groundTemp={4000} intensity={0.25} />
     <StudioEnv intensity={0.4} rotationY={0.6} />
     <Product />

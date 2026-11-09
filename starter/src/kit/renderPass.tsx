@@ -154,28 +154,63 @@ export const RenderPass: React.FC<SplitSpec> = (spec) => {
   return null;
 };
 
-/** DOM labels that ride along each band (render outside <Stage>, in the same AbsoluteFill). */
+/**
+ * DOM labels that ride along each band (render outside <Stage>, in the same AbsoluteFill).
+ * By default each label sits at the TOP or BOTTOM edge of the frame (whichever shows more of its band),
+ * so labels stay out of the centre where the subject is, and inside the 9:16 safe area.
+ */
 export const PassLabels: React.FC<{
   spec: SplitSpec;
   labels?: Partial<Record<PassName, string>>;
-  /** vertical position (0..1) of each band's label; staggered so they never collide */
-  rows?: number[];
-}> = ({ spec, labels = {}, rows = [0.2, 0.42, 0.64] }) => {
+  /**
+   * optional manual vertical positions (0..1), one per band; `undefined` entries stay automatic,
+   * e.g. rows={[undefined, 0.66, undefined]} pins only the clay label.
+   */
+  rows?: (number | undefined)[];
+}> = ({ spec, labels = {}, rows }) => {
   const frame = useCurrentFrame();
-  const { width, height } = useVideoConfig();
+  const { width, height, durationInFrames } = useVideoConfig();
   const aspect = width / height;
-  const seams = spec.seams(frame);
-  const edges = [0, ...seams.slice(0, spec.passes.length - 1), 1];
+  const n = spec.passes.length;
+  const edgesAt = (t: number) => [0, ...spec.seams(t).slice(0, n - 1), 1];
+  const edges = edgesAt(frame);
   const names: Record<PassName, string> = { beauty: "BEAUTY", clay: "CLAY", wire: "WIREFRAME", ...labels };
   const fs = Math.round(Math.min(width, height) * 0.024);
+  const portrait = aspect < 1;
+  const edgeRows = portrait ? [0.12, 0.74] : [0.08, 0.92];
+  const [uMin, uMax] = portrait ? [0.12, 0.8] : [0.1, 0.9];
+  // u (0..1 across) where the split coordinate equals d on row y
+  const uAt = (d: number, y: number) => (spec.split === "diagonal" ? (d * (aspect + 1) - y) / aspect : d);
+  const span = (e: number[], i: number, y: number): [number, number] => [
+    Math.max(uMin, uAt(e[i], y)),
+    Math.min(uMax, uAt(e[i + 1], y)),
+  ];
+  // The row is chosen ONCE per shot (the one where the band is narrowest-at-worst is widest over
+  // the whole shot), so a label never jumps between top and bottom while the seams slide.
+  const samples = Array.from({ length: 9 }, (_, k) => edgesAt(((durationInFrames - 1) * k) / 8));
+  const rowFor = (i: number): number => {
+    let bestY = edgeRows[0];
+    let bestW = -Infinity;
+    for (const y of edgeRows) {
+      const w = Math.min(...samples.map((e) => { const [a, b] = span(e, i, y); return b - a; }));
+      if (w > bestW) { bestW = w; bestY = y; }
+    }
+    return bestY;
+  };
+  const place = (i: number): [number, number] => {
+    const pinned = rows?.[i];
+    if (pinned !== undefined) {
+      return [Math.min(uMax, Math.max(uMin, uAt((edges[i] + edges[i + 1]) / 2, pinned))), pinned];
+    }
+    const y = rowFor(i);
+    const [a, b] = span(edges, i, y);
+    return [(a + b) / 2, y];
+  };
   return (
     <AbsoluteFill style={{ pointerEvents: "none" }}>
       {spec.passes.map((p, i) => {
-        const y = rows[i] ?? 0.5;
-        const dc = (edges[i] + edges[i + 1]) / 2;
-        // solve the split coordinate for x on this row
-        const u = spec.split === "diagonal" ? (dc * (aspect + 1) - y) / aspect : dc;
-        const x = Math.min(0.85, Math.max(0.15, u)) * width;
+        const [u, y] = place(i);
+        const x = u * width;
         return (
           <div
             key={p}

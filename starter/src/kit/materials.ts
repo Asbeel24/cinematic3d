@@ -169,6 +169,28 @@ export const jelly = (color: string, size = 0.1) =>
 
 /** Fur is a component (many shells), not a single material: see `<Fur>` in kit/fur.tsx. */
 
+/**
+ * Clear glass shell for a container WITH SOMETHING INSIDE (perfume bottle, jar, glass of tea).
+ * three's transmission only refracts opaque objects, so a transmissive `glass()` hides a transmissive liquid.
+ * This shell adds only reflections / highlights over whatever is behind it (black + additive),
+ * so the contents stay visible. Put the contents (`jelly(color, size)` for coloured liquid) inside, 1–4 mm smaller.
+ */
+export const glassShell = (envIntensity = 2.5) =>
+  memo(`glassShell:${envIntensity}`, () =>
+    new THREE.MeshPhysicalMaterial({
+      color: "#000000",
+      roughness: 0.03,
+      metalness: 0,
+      clearcoat: 1,
+      clearcoatRoughness: 0.02,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      envMapIntensity: envIntensity,
+      specularIntensity: 1,
+    }),
+  );
+
 /** Matte paper / card. */
 export const paper = (color = "#e9e2d2") =>
   memo(`paper:${color}`, () =>

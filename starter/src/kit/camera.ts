@@ -49,10 +49,59 @@ export const shot = {
   }),
 };
 
+/**
+ * Auto-framing: describe the subject, get a camera that shows it at a given size,
+ * centred in the platform safe area (9:16) — no trial-and-error with coordinates.
+ */
+export type FrameSpec = {
+  /** centre of the subject's bounding box (world, metres) */
+  center: Vec3;
+  /** bounding box size [w, h, d] in metres (for a turning product use the widest footprint) */
+  size: Vec3;
+  /** fraction of the frame height the subject should fill (0.3 small … 0.6 tight). Default 0.42 */
+  fill?: number;
+  /** camera height angle above the subject in degrees (0 = eye level, 15 = slight top, 35 = desk view). Default 15 */
+  elevation?: number;
+  /** camera angle around the subject in degrees (0 = from +z, positive = from the right). Default 0 */
+  azimuth?: number;
+};
+
+/** Camera position/target that frames `f` with lens `lens` at aspect `aspect` (w/h). */
+export function frameSubject(f: FrameSpec, lens: Lens, aspect: number) {
+  const fill = f.fill ?? 0.42;
+  const el = THREE.MathUtils.degToRad(f.elevation ?? 15);
+  const az = THREE.MathUtils.degToRad(f.azimuth ?? 0);
+  const [w, h, d] = f.size;
+  const effH = h * Math.cos(el) + d * Math.sin(el);
+  const effW = Math.abs(w * Math.cos(az)) + Math.abs(d * Math.sin(az));
+  const tanV = Math.tan(THREE.MathUtils.degToRad(lensToFov(lens, aspect)) / 2);
+  const portrait = aspect < 1;
+  const maxW = portrait ? 0.7 : 0.6; // subject never wider than this fraction of the frame
+  const dist = Math.max(effH / (fill * 2 * tanV), effW / (maxW * 2 * tanV * aspect));
+  const c = new THREE.Vector3(...f.center);
+  const dir = new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el));
+  const position = c.clone().addScaledVector(dir, dist);
+  const target = c.clone();
+  if (portrait) {
+    // safe area 9:16: top 8 %, bottom 22 %, left 6 %, right 14 % → its centre is 43 % from the top, 46 % from the left
+    const hVis = 2 * dist * tanV;
+    const fwd = dir.clone().negate();
+    const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 1, 0)).normalize();
+    const upc = new THREE.Vector3().crossVectors(right, fwd).normalize();
+    target.addScaledVector(upc, -0.07 * hVis).addScaledVector(right, 0.04 * hVis * aspect);
+  }
+  const r = (v: THREE.Vector3): Vec3 => [+v.x.toFixed(4), +v.y.toFixed(4), +v.z.toFixed(4)];
+  return { position: r(position), target: r(target), distance: +dist.toFixed(4) };
+}
+
 export type ShotSpec = {
   lens: Lens;
-  position: Vec3;
-  target: Vec3;
+  /** camera position; optional when `frame` is given */
+  position?: Vec3;
+  /** look-at point; optional when `frame` is given */
+  target?: Vec3;
+  /** auto-framing from the subject's bounds (overrides position/target). Use relative moves (dolly/orbit/crane) with it. */
+  frame?: FrameSpec;
   move?: Move;
   /** handheld micro-drift amplitude in output pixels (2–6). Default on (3 px). false = locked off. */
   drift?: { px?: number; seed?: number } | false;
@@ -92,6 +141,10 @@ export function useShot(spec: ShotSpec) {
     }
   }, [spec.move, stage]);
 
+  const framed = spec.frame ? frameSubject(spec.frame, spec.lens, aspect) : null;
+  const basePos = framed?.position ?? spec.position;
+  const baseTgt = framed?.target ?? spec.target;
+  if (!basePos || !baseTgt) throw new Error("useShot: give either `frame` or both `position` and `target`");
   const pos = new THREE.Vector3();
   const tgt = new THREE.Vector3();
   const tmp = new THREE.Vector3();
@@ -101,14 +154,14 @@ export function useShot(spec: ShotSpec) {
     const m = spec.move ?? { kind: "static" };
     const end = durationInFrames - 1;
     const k = (w: Window) => progress(t, w.start ?? 0, w.end ?? end, w.ease ?? ease.cine);
-    pos.copy(v3(spec.position));
-    tgt.copy(v3(spec.target));
+    pos.copy(v3(basePos));
+    tgt.copy(v3(baseTgt));
     let yaw = 0;
     let pitch = 0;
 
     switch (m.kind) {
       case "push":
-        pos.lerpVectors(v3(spec.position), v3(m.to), k(m));
+        pos.lerpVectors(v3(basePos), v3(m.to), k(m));
         break;
       case "dolly": {
         tmp.subVectors(tgt, pos).normalize();

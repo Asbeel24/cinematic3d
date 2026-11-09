@@ -24,7 +24,14 @@ export type FurProps = {
   /** world-space gravity strength (fraction of length at the tip) */
   gravity?: number;
   /** wind strength and direction (world) */
-  wind?: { strength: number; dir: [number, number, number]; speed?: number };
+  wind?: {
+    strength: number;
+    dir: [number, number, number];
+    /** speed of the built-in slow "breathing" (factor 0.65 ± 0.35) */
+    speed?: number;
+    /** optional gust envelope (seconds → multiplier); replaces the breathing, e.g. gusts({ at: [1, 2, 4] }) */
+    gust?: (sec: number) => number;
+  };
   seed?: number;
   castShadow?: boolean;
 } & Omit<ThreeElements["group"], "children">;
@@ -121,7 +128,9 @@ export const Fur: React.FC<FurProps> = ({
     const d = new THREE.Vector3(...wind.dir).normalize();
     // slow breathing wind, never linear
     const s = t / 30;
-    const k = w * (0.65 + 0.35 * Math.sin(s * 1.3 * (wind.speed ?? 1)) * Math.sin(s * 0.47 + 1.1));
+    const k = wind.gust
+      ? w * wind.gust(s)
+      : w * (0.65 + 0.35 * Math.sin(s * 1.3 * (wind.speed ?? 1)) * Math.sin(s * 0.47 + 1.1));
     shared.uWind.value.copy(d).multiplyScalar(k);
   });
 
@@ -133,3 +142,25 @@ export const Fur: React.FC<FurProps> = ({
     </group>
   );
 };
+
+/**
+ * Gusty wind envelope for <Fur wind={{ ..., gust: gusts({ at: [1, 2, 4] }) }}>.
+ * Returns a multiplier of wind.strength: `base` between gusts, `peak` at each time in `at` (seconds),
+ * fast rise (`rise` s) and slow fall (`fall` s). Pure function of time.
+ */
+export const gusts = ({
+  at,
+  base = 0.25,
+  peak = 1.2,
+  rise = 0.35,
+  fall = 0.7,
+}: { at: number[]; base?: number; peak?: number; rise?: number; fall?: number }) =>
+  (sec: number) => {
+    let g = 0;
+    for (const c of at) {
+      const d = sec - c;
+      const e = d < 0 ? (d > -rise ? Math.sin((Math.PI / 2) * (1 + d / rise)) ** 2 : 0) : Math.exp(-d / fall) * (d < 4 * fall ? 1 : 0);
+      g = Math.max(g, e);
+    }
+    return base + (peak - base) * g;
+  };

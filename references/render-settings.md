@@ -23,7 +23,8 @@
 | `render.mjs --final --format 1:1` | 另一个画幅 | |
 | `render.mjs --comp look-fur-9x16 --final` | 任意合成 | 渲参考 Look |
 
-每次渲染结束都会打印并写入 `out/<comp>.json`：耗时、每帧耗时、文件大小、GL 后端。
+每次渲染结束都会打印 `wrote <路径>`，并**最后**写入报告 `out/<comp>.json`（代理片是 `out/<comp>-proxy.json`）：耗时、每帧耗时、文件大小、GL 后端。
+报告文件出现 = 渲染完成。后台渲染时这样等：`timeout 590 bash -c 'until [ -f out/<comp>.json ]; do sleep 20; done'`。
 
 ## GL 后端
 - Mac：默认 `angle`（用 GPU）。
@@ -42,10 +43,12 @@
 
 另外两种渲染的耗时（同一台 CPU 机器）：
 - `--proxy`：只比正式快约 1.3 倍（每帧 2–3 s，6 秒片 5–7 分钟），因为 CPU 软渲染的固定开销大。
-- `stills.mjs`：每帧 6–20 s（每帧冷启动），5 帧约 1 分钟。
+- `stills.mjs`：每帧 6–20 s（每帧冷启动），5 帧约 1 分钟。机器很忙时单帧可能超时，stills 会自动重试一次。
+- 同时跑两个渲染会让每个都慢一倍左右。
 
 M 系列 Mac 上用 GPU 会快得多；用 `doctor.mjs` 的估算看本机速度。
 动态模糊的段落耗时 ≈ 子帧数倍。
 
 ## 文件大小
-颗粒让 CRF 18 的文件偏大（6 秒 35–70 MB；画面平、颜色浅的果冻字只有几 MB）。平台会再压缩；需要小文件时把 `film.grain` 从 0.35 降到 0.2，或用 `--proxy` 的 CRF 23 版本。
+代理片画面平、颜色浅时可能只有 0.1–0.5 MB，不是坏了。要确认就抽一帧看：`node <skill>/scripts/frame.mjs out/<comp>-proxy.mp4 3`（输出 `out/<comp>-proxy-3s.png`，再 Read）。
+颗粒让 CRF 18 的文件偏大（9:16 六秒 35–80 MB；1:1 约 20 MB；画面平、颜色浅的果冻字只有几 MB）。平台会再压缩；需要小文件时把 `film.grain` 从 0.35 降到 0.2，或用 `--proxy` 的 CRF 23 版本。

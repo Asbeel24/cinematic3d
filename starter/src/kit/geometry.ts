@@ -67,3 +67,58 @@ export function wallWithHole(
 export function slatPositions(count: number, top: number, bottom: number) {
   return Array.from({ length: count }, (_, i) => top - ((top - bottom) * (i + 0.5)) / count);
 }
+
+/* ---- helpers added after the M4 blind test ---- */
+
+/**
+ * A round rod from point a to point b (glasses temples, cables between two points, legs, handles).
+ * The returned geometry is already placed in world space: use it with position 0.
+ */
+export function rod(a: [number, number, number], b: [number, number, number], r = 0.002, seg = 16) {
+  const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b);
+  const len = A.distanceTo(B);
+  const g = new THREE.CylinderGeometry(r, r, len, seg);
+  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), B.clone().sub(A).normalize());
+  g.applyQuaternion(q);
+  g.translate((A.x + B.x) / 2, (A.y + B.y) / 2, (A.z + B.z) / 2);
+  return g;
+}
+
+/** A flat ring / band with a rectangular cross-section (bezel, strap loop, lens rim). Axis = +y. */
+export function ring(rOuter: number, rInner: number, depth: number, seg = 96) {
+  const pts = [
+    new THREE.Vector2(rInner, -depth / 2),
+    new THREE.Vector2(rOuter, -depth / 2),
+    new THREE.Vector2(rOuter, depth / 2),
+    new THREE.Vector2(rInner, depth / 2),
+    new THREE.Vector2(rInner, -depth / 2),
+  ];
+  const g = new THREE.LatheGeometry(pts, seg);
+  g.computeVertexNormals();
+  return g;
+}
+
+/** Torus (mug handle, round frame). R = ring radius, r = tube radius, arc in radians (2π = closed). Axis = +z. */
+export const torus = (R: number, r: number, arc = Math.PI * 2, seg = 64) => new THREE.TorusGeometry(R, r, 16, seg, arc);
+
+/**
+ * A sheet bent along x (book page, paper, cloth): width w (x), depth d (z), lifted by `lift` metres
+ * in the middle of each half like an open page. Returns a plane lying on y = 0 with UVs.
+ */
+export function bentSheet(w: number, d: number, lift = 0.01, segX = 48, segZ = 4) {
+  const g = new THREE.PlaneGeometry(w, d, segX, segZ);
+  g.rotateX(-Math.PI / 2);
+  const p = g.attributes.position as THREE.BufferAttribute;
+  for (let i = 0; i < p.count; i++) {
+    const u = Math.min(1, Math.max(0, p.getX(i) / w + 0.5)); // clamp: never NaN
+    p.setY(i, lift * Math.sin(u * Math.PI));
+  }
+  g.computeVertexNormals();
+  return g;
+}
+
+/** Rotate a y-axis shape (lathe, cylinder, ring) so its axis points along +z (towards the camera). */
+export function faceZ<T extends THREE.BufferGeometry>(g: T): T {
+  g.rotateX(Math.PI / 2);
+  return g;
+}

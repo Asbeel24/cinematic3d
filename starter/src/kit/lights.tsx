@@ -120,6 +120,33 @@ export function makeGoboTexture(g: GoboSpec): THREE.CanvasTexture {
 /* Key light (the one motivated light)                                  */
 /* ------------------------------------------------------------------ */
 
+/** Soft round cone mask (white centre → black edge), used by Beam/Dust/Steam when the key has no gobo. */
+const coneCache = new Map<number, THREE.CanvasTexture>();
+export function makeConeTexture(penumbra: number): THREE.CanvasTexture {
+  const key = Math.round(penumbra * 100);
+  if (coneCache.has(key)) return coneCache.get(key)!;
+  const s = 256;
+  const el = document.createElement("canvas");
+  el.width = el.height = s;
+  const c = el.getContext("2d", { willReadFrequently: true })!;
+  c.fillStyle = "#000";
+  c.fillRect(0, 0, s, s);
+  const inner = Math.max(0, 1 - Math.max(0.05, penumbra)) * (s / 2);
+  const g = c.createRadialGradient(s / 2, s / 2, inner, s / 2, s / 2, s / 2);
+  g.addColorStop(0, "#fff");
+  g.addColorStop(1, "#000");
+  c.fillStyle = "#fff";
+  c.beginPath();
+  c.arc(s / 2, s / 2, inner, 0, Math.PI * 2);
+  c.fill();
+  c.fillStyle = g;
+  c.fillRect(0, 0, s, s);
+  const t = new THREE.CanvasTexture(el);
+  t.colorSpace = THREE.NoColorSpace;
+  coneCache.set(key, t);
+  return t;
+}
+
 export type KeyLightHandle = {
   light: THREE.SpotLight | null;
   gobo: THREE.Texture | null;
@@ -158,6 +185,8 @@ export type KeyLightProps = {
   /** soft shadow radius in shadow-map texels */
   shadowRadius?: number;
   shadowMapSize?: number;
+  /** soft edge of the cone 0..1 (default sun .05 / softbox 1 / spot .35). With a gobo the gobo's own softness is used. */
+  penumbra?: number;
   children?: React.ReactNode;
 };
 
@@ -177,6 +206,7 @@ export const KeyLight: React.FC<KeyLightProps> = ({
   angle,
   shadowRadius,
   shadowMapSize = 2048,
+  penumbra,
   children,
 }) => {
   const scene = useThree((s) => s.scene);
@@ -199,9 +229,12 @@ export const KeyLight: React.FC<KeyLightProps> = ({
     spot: { angle: 25, penumbra: 0.35, radius: 4, intensity: 8 },
   }[kind];
   light.angle = THREE.MathUtils.degToRad(angle ?? defaults.angle);
-  light.penumbra = gobo ? 0 : defaults.penumbra;
+  // three ignores penumbra when a gobo map is set: the gobo texture carries its own soft edge
+  light.penumbra = gobo ? 0 : (penumbra ?? defaults.penumbra);
   light.shadow.radius = shadowRadius ?? defaults.radius;
-  light.shadow.camera.near = 0.5;
+  // near plane scales with the light distance so close practicals (desk lamps) still cast shadows
+  const lightDist = Math.hypot(position[0] - target[0], position[1] - target[1], position[2] - target[2]);
+  light.shadow.camera.near = Math.min(0.5, Math.max(0.02, lightDist * 0.2));
   light.shadow.camera.far = 40;
 
   const handle = useMemo<KeyLightHandle>(
@@ -212,7 +245,8 @@ export const KeyLight: React.FC<KeyLightProps> = ({
       color,
       uniforms: {
         uSpotMat: { value: new THREE.Matrix4() },
-        uGobo: { value: goboTex },
+        // volumetrics (Beam/Dust/Steam) read the gobo, or a soft cone mask when there is none
+        uGobo: { value: goboTex ?? makeConeTexture(gobo ? 0 : (penumbra ?? defaults.penumbra)) },
         uLightPos: { value: new THREE.Vector3() },
         uLightColor: { value: color.clone() },
         uTime: { value: 0 },

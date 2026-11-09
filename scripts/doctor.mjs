@@ -3,6 +3,7 @@
 //   node <skill>/scripts/doctor.mjs
 // Works anywhere: outside a shot project it checks <skill>/starter.
 // Prints one line per check: PASS / WARN / FAIL + how to fix. Exit code 1 if anything FAILs.
+import { execSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -60,6 +61,14 @@ const fontDir = path.join(root, "public", "fonts");
 const fonts = fs.existsSync(fontDir) ? fs.readdirSync(fontDir).filter((f) => f.endsWith(".woff2")) : [];
 if (fonts.length >= 4) add("PASS", "fonts", fonts.join(", "));
 else add("FAIL", "fonts", `found ${fonts.length} woff2 in public/fonts`, "re-copy starter/public/fonts from the skill");
+
+// 4b. a system CJK font (Chinese captions / labels fall back to it; macOS and Windows always have one)
+if (process.platform === "linux") {
+  let cjk = "";
+  try { cjk = execSync("fc-list :lang=zh family", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim().split("\n")[0] || ""; } catch {}
+  if (cjk) add("PASS", "cjk font", cjk);
+  else add("WARN", "cjk font", "no Chinese font found (only matters for Chinese text)", "install one: `sudo apt install fonts-noto-cjk` (or fonts-wqy-zenhei)");
+}
 
 // 5. browser + GL + one-frame test render + determinism
 const gl = glBackend();

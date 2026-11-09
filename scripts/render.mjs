@@ -19,6 +19,8 @@ const format = arg("format", cfg.format);
 const compId = arg("comp", `${cfg.name}-${formatId(format)}`);
 const outDir = path.join(root, "out");
 fs.mkdirSync(outDir, { recursive: true });
+// a stale report from an earlier run would look like 'finished' to anyone waiting on it
+fs.rmSync(path.join(outDir, `${compId}${proxy ? "-proxy" : ""}.json`), { force: true });
 const ext = prores ? "mov" : "mp4";
 const out = path.join(outDir, `${compId}${proxy ? "-proxy" : ""}.${ext}`);
 
@@ -39,6 +41,7 @@ await renderMedia({
   puppeteerInstance: browser,
   chromiumOptions,
   concurrency: 1,
+  timeoutInMilliseconds: 120000,
   scale: proxy ? 0.5 : 1,
   imageFormat: "png",
   ...(prores
@@ -70,5 +73,8 @@ const report = {
   fileSize: `${(size / 1e6).toFixed(1)} MB`,
   gl: glBackend(),
 };
-fs.writeFileSync(path.join(outDir, `${compId}${proxy ? "-proxy" : ""}.json`), JSON.stringify(report, null, 2));
+// the JSON report is written last: its existence means the render is finished
+const reportFile = path.join(outDir, `${compId}${proxy ? "-proxy" : ""}.json`);
+fs.writeFileSync(reportFile, JSON.stringify(report, null, 2));
 console.log(JSON.stringify(report, null, 2));
+console.log(`wrote ${out}\nreport ${reportFile}`);

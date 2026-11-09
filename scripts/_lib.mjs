@@ -73,7 +73,11 @@ export function arg(name, def) {
   return v === undefined || v.startsWith("--") ? true : v;
 }
 
-export const fmtMs = (ms) => (ms < 60000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.floor(ms / 60000)} min ${((ms % 60000) / 1000).toFixed(0)} s`);
+export const fmtMs = (ms) => {
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)} s`;
+  const s = Math.round(ms / 1000);
+  return `${Math.floor(s / 60)} min ${s % 60} s`;
+};
 
 export const LOOKS = ["golden-hour", "render-pass", "jelly-type", "fur", "turntable"];
 

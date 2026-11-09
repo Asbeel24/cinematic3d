@@ -14,6 +14,8 @@ const compId = arg("comp", `${cfg.name}-${formatId(format)}`);
 // the shot's default comp writes to review/, any other comp to review/<comp>/
 const outDir = compId === `${cfg.name}-${formatId(cfg.format)}` ? path.join(root, "review") : path.join(root, "review", compId);
 fs.mkdirSync(outDir, { recursive: true });
+// clear stills from earlier runs so the review folder only shows this run
+for (const f of fs.readdirSync(outDir)) if (/^f\d+\.png$/.test(f)) fs.rmSync(path.join(outDir, f));
 
 const t0 = Date.now();
 const { renderStill, selectComposition, openBrowser } = await import(req(root).resolve("@remotion/renderer"));
@@ -30,11 +32,19 @@ const frames = String(arg("frames", "0,25%,50%,75%,last"))
 
 const stats = { composition: compId, width: comp.width, height: comp.height, fps: comp.fps, durationInFrames: comp.durationInFrames, frames: [] };
 const files = [];
+const nanLogs = new Set();
 const tiles = [];
 for (const f of frames) {
   const file = path.join(outDir, `f${String(f).padStart(4, "0")}.png`);
   const ts = Date.now();
-  await renderStill({ serveUrl, composition: comp, frame: f, output: file, puppeteerInstance: browser, chromiumOptions, overwrite: true });
+  const opts = { serveUrl, composition: comp, frame: f, output: file, puppeteerInstance: browser, chromiumOptions, overwrite: true, timeoutInMilliseconds: 120000, onBrowserLog: (l) => { if (/NaN/.test(l.text)) nanLogs.add(l.text.slice(0, 160)); } };
+  try {
+    await renderStill(opts);
+  } catch (e) {
+    // a busy machine can time out once; retry before giving up
+    console.log(`frame ${f}: ${String(e.message).split("\n")[0]} → retrying once`);
+    await renderStill(opts);
+  }
   const ms = Date.now() - ts;
   // exposure stats from raw RGB
   const img = decodePNG(fs.readFileSync(file));
@@ -83,5 +93,9 @@ fs.writeFileSync(contact, encodePNG(sheet));
 stats.contact = path.relative(root, contact);
 stats.pass = stats.frames.every((f) => f.pass);
 stats.totalMs = Date.now() - t0;
+if (nanLogs.size) {
+  stats.nanWarnings = [...nanLogs];
+  console.log(`WARNING: geometry produced NaN values (a mesh with NaN vertices can turn the whole frame black):\n  ${[...nanLogs].join("\n  ")}`);
+}
 fs.writeFileSync(path.join(outDir, "stats.json"), JSON.stringify(stats, null, 2));
 console.log(`contact sheet: ${contact}\nstats: ${path.join(outDir, "stats.json")}\nexposure ${stats.pass ? "PASS" : "CHECK"} · total ${fmtMs(stats.totalMs)}`);

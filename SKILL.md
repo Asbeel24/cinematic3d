@@ -59,24 +59,35 @@ cd <name>
 改的顺序：
 1. 文件顶部的配置对象（`GOLDEN` / `TURNTABLE` / `JELLY` / `FUR` / `RENDERPASS`）：先改标了 `editable` 的字段（文字、颜色、色温、转角……）。`do not edit` 字段是灯位和几何的依赖，不要动。
 2. 换主体：用 `kit/geometry.ts`（`roundedBox` / `lathe` / `cylinder` / `smoothProfile`）和 `kit/materials.ts` 拼出新物体，替换示例里的产品组件。尺寸用**真实米制**（音箱高 0.2 m，杯子高 0.09 m）。
-3. 改镜头：`useShot({...})` 的 `lens / position / target / move / focus`。
+3. 改镜头。**换了主体就用自动取景，不要手调坐标**：
+   ```ts
+   useShot({ lens: 50, frame: { center: [0, 0.2, 0], size: [0.26, 0.16, 0.11], fill: 0.42, elevation: 15 },
+             move: shot.dolly(0.08), focus: { point: [0, 0.2, 0.055], aperture: 4 } })
+   ```
+   `frame` 按主体的包围盒算出机位，让主体占画面高度的 `fill`，并落在 9:16 安全区中心。
+   配合相对运动（`dolly` / `orbit` / `crane`）。焦段按主体大小选：< 10 cm 用 85，10–60 cm 用 50，整张桌子 / 房间用 35。
+   多个物体时 `center` / `size` 取它们合起来的包围盒。
 4. 需要字幕：`kit/overlay.tsx` 的 `<Caption>` / `<Title>`，放在 `<Stage>` 外层的 `<AbsoluteFill>` 里。
 
 API 全在 `references/kit-api.md`。**只组合 kit，不重写底层**：不要自己写后期、不要自己建相机或灯光类、不要改 `src/kit/`。
+主体的几何可以自己写：kit 的 `geometry.ts` 不够时，直接用 three 的几何体（`TorusGeometry`、`ExtrudeGeometry`、自定义 `BufferGeometry`）都可以。
 
 ### ④ 关键帧自检（闸门 2）
 ```bash
 node <skill>/scripts/stills.mjs            # 默认第 0 / 25% / 50% / 75% / 最后一帧
 ```
 用 Read 打开 `review/contact.png`，看 `review/stats.json`，逐项对照 `references/review-checklist.md`。
+stills 打印 `WARNING: geometry produced NaN` 时先修几何（NaN 顶点会让整帧变黑）。
+`--frames 0,45,90,179` 可以指定帧（联系表会按给的帧重排，适合检查某段时间里的变化）。
 联系表每帧只有约 400 px 宽：看文字锐度、细纹理、焦点时，再 Read 对应的全尺寸 `review/fNNNN.png`。
-不过就回到 ③，**一次只改一个变量**（一个参数，或一个组件 / 贴图的一处改动），然后重跑 stills。
+不过就回到 ③，**一次只改一个变量**（一个参数；或一个组件 / 贴图的一处改动；或一次机位调整，起点和终点一起改算一次），然后重跑 stills。
 第一次 stills 不算轮次，之后最多 4 轮修改。4 轮还不过，把联系表和问题交给用户。
 每次在回复里写结论：哪几项 PASS、改了什么。
 
 ### ⑤ 代理渲染（闸门 3）
 ```bash
 node <skill>/scripts/render.mjs --proxy    # 半分辨率、无动态模糊 → out/<name>-<fmt>-proxy.mp4
+node <skill>/scripts/frame.mjs out/<name>-<fmt>-proxy.mp4 3   # 抽第 3 秒一帧成 PNG，Read 确认成片没问题
 ```
 把代理片路径和联系表交给用户。用户提出修改 → 回到 ③（见下面"迭代"规则）。
 
@@ -88,7 +99,10 @@ node <skill>/scripts/render.mjs --final --format 1:1   # 另一个画幅
 ```
 交付时写：MP4 路径、时长 / 画幅、耗时、文件大小、联系表路径。
 
-渲染很慢（CPU 上一条 6 秒片 8–16 分钟，代理片也要 5–7 分钟）：工具有前台时间上限时，把 `render.mjs` 放到后台跑，等它结束再读输出。
+渲染很慢（CPU 上一条 6 秒片 8–16 分钟，代理片 5–7 分钟；**fur Look 每帧 8–9 s，正式和代理都要 25 分钟左右**，代理省不了多少，可以跳过直接出正式片）：工具有前台时间上限时，把 `render.mjs` 放到后台跑。
+`render.mjs` 最后才写报告文件，等它出现就是渲完了：
+`timeout 590 bash -c 'until [ -f out/<comp>.json ]; do sleep 20; done'`（`<comp>` 是合成 id，如 `my-shot-9x16`、`my-shot-1x1`；代理片是 `out/<comp>-proxy.json`）。
+超时没出来就再跑一次同样的等待；看进度：`grep -o 'rendered [0-9]*/[0-9]*' <日志> | tail -1`。
 日志里的 `Detected differing memory amounts`、`THREE.Clock: This module has been deprecated` 是无害提示，忽略。
 
 ## 规则
@@ -107,7 +121,8 @@ node <skill>/scripts/render.mjs --final --format 1:1   # 另一个画幅
 
 **灯光**
 - 一个有来由的主光（`<KeyLight>`：窗外太阳、柔光箱、聚光）加一个反射补光（`<Bounce>`）。可以再加弱的 `<SkyFill>` / `<StudioEnv>` 打底。
-- 主光和环境要有冷暖对比：暖主光（3000–4500K）配冷补光（6500–9500K），或者反过来。
+- 要有冷暖对比：场景里任意两盏灯（主光、反射、天光的天色或地色都算）至少有一组差 2000K 以上。常见是暖主光（3000–4500K）配冷补光（6500–9500K）；"偏冷、科技感"用冷主光（6000–6500K）配冷补光，再用暖一点的 `SkyFill groundTemp`（3500–4000K）做对比。
+- 台灯、灯泡这类画面里的光源：见 `references/light.md` 的"实景光源"。
 - 有光束就要有雾（`haze`）和灰尘（`<Dust>`）。
 - 暗部保留细节：死黑 < 3%。暗了就先加补光，不要先拉曝光。
 

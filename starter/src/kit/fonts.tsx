@@ -6,8 +6,9 @@ import { continueRender, delayRender, staticFile } from "remotion";
  * Canvas textures and DOM overlays use these families by name.
  */
 export const FONTS = {
-  ui: "Inter",
-  round: "Fredoka",
+  // CJK falls back to the system's Chinese font (not bundled: CJK fonts are 10+ MB)
+  ui: "Inter, 'PingFang SC', 'Noto Sans CJK SC', 'Source Han Sans SC', 'Microsoft YaHei', 'WenQuanYi Zen Hei', sans-serif",
+  round: "Fredoka, 'PingFang SC', 'Noto Sans CJK SC', sans-serif",
 } as const;
 
 const faces: { family: string; file: string; weight: string }[] = [
