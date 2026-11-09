@@ -6,6 +6,7 @@ import { Fog, Stage, useMotionBlur, useTimeline } from "../../kit/stage";
 import { shot, useShot } from "../../kit/camera";
 import { Bounce, KeyLight, SkyFill, StudioEnv } from "../../kit/lights";
 import { ease } from "../../kit/motion";
+import { jelly } from "../../kit/materials";
 import fredoka from "../../kit/fonts/fredoka-600.typeface.json";
 
 /**
@@ -51,22 +52,6 @@ function letterGeometry(ch: string) {
   return g;
 }
 
-function jellyMaterial(color: string) {
-  const c = new THREE.Color(color);
-  return new THREE.MeshPhysicalMaterial({
-    color: c.clone().lerp(new THREE.Color("#ffffff"), 0.08),
-    roughness: 0.14,
-    transmission: 0.72,
-    thickness: J.size * 0.6,
-    ior: 1.38,
-    attenuationColor: c,
-    attenuationDistance: J.size * 0.5,
-    clearcoat: 1,
-    clearcoatRoughness: 0.05,
-    specularIntensity: 1,
-  });
-}
-
 /** Fall, squash–stretch and wobble for one letter. Pure function of t. */
 function letterPose(t: number, hit: number) {
   const fall = 11; // frames of free fall before impact
@@ -94,7 +79,7 @@ const Letters: React.FC = () => {
       const glyph = (fredoka as { glyphs: Record<string, { ha: number }> }).glyphs[ch];
       const adv = ((glyph?.ha ?? 600) / 1000) * J.size * 1.18;
       const g = letterGeometry(ch);
-      const item = { ch, g, m: jellyMaterial(J.colors[i % J.colors.length]), x: x + adv / 2 };
+      const item = { ch, g, m: jelly(J.colors[i % J.colors.length], J.size), x: x + adv / 2 };
       x += adv;
       return item;
     });
@@ -185,3 +170,5 @@ export const JellyType: React.FC<{ durationInFrames: number }> = () => (
     <Letters />
   </Stage>
 );
+
+export default JellyType;

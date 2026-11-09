@@ -343,3 +343,5 @@ export const GoldenHour: React.FC<{ durationInFrames: number }> = ({ durationInF
     </Stage>
   );
 };
+
+export default GoldenHour;

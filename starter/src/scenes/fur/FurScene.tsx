@@ -154,3 +154,5 @@ export const FurScene: React.FC<{ durationInFrames: number }> = () => (
     <Headphones />
   </Stage>
 );
+
+export default FurScene;

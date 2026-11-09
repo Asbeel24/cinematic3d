@@ -1,5 +1,6 @@
 import React, { useMemo, useRef } from "react";
 import * as THREE from "three";
+import { useVideoConfig } from "remotion";
 import { Fog, Stage, useTimeline } from "../../kit/stage";
 import { shot, useShot } from "../../kit/camera";
 import { Bounce, KeyLight, SkyFill, StudioEnv } from "../../kit/lights";
@@ -21,6 +22,8 @@ export const TURNTABLE = {
   keyTemp: 4300,
   /** degrees the product turns over the shot */
   turn: 70,
+  /** when the product faces the camera straight on, as a fraction of the shot (0.62 ≈ 3.7 s of 6 s) */
+  frontAt: 0.62,
   background: "#302c28",
   /** do not edit */
   plinthR: 0.25,
@@ -191,9 +194,11 @@ const stone = () => {
 const Product: React.FC = () => {
   const turn = useRef<THREE.Group>(null!);
   const stoneMat = useMemo(stone, []);
+  const { durationInFrames } = useVideoConfig();
   useTimeline((t) => {
-    const k = progress(t, 0, 179, ease.inOut);
-    turn.current.rotation.y = THREE.MathUtils.degToRad(-T.turn / 2 + T.turn * k) - 0.35;
+    const k = progress(t, 0, durationInFrames - 1, ease.inOut);
+    // rotation 0 = front faces the camera (+z); it happens at frontAt of the shot
+    turn.current.rotation.y = THREE.MathUtils.degToRad(T.turn * (k - ease.inOut(T.frontAt)));
   });
   return (
     <group>
@@ -261,3 +266,5 @@ export const Turntable: React.FC<{ durationInFrames: number }> = () => (
     <Floor />
   </Stage>
 );
+
+export default Turntable;

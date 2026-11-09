@@ -1,6 +1,6 @@
 import React, { useMemo, useRef } from "react";
 import * as THREE from "three";
-import { AbsoluteFill } from "remotion";
+import { AbsoluteFill, useVideoConfig } from "remotion";
 import { Fog, Stage, useTimeline } from "../../kit/stage";
 import { shot, useShot } from "../../kit/camera";
 import { Bounce, KeyLight, SkyFill, StudioEnv } from "../../kit/lights";
@@ -26,17 +26,18 @@ export const RENDERPASS = {
 };
 const R = RENDERPASS;
 
-export const splitSpec: SplitSpec = {
+/** The split for a shot of `frames` frames: seams slide from seamsFrom to seamsTo. */
+export const makeSplitSpec = (frames: number): SplitSpec => ({
   passes: ["beauty", "clay", "wire"],
   split: "diagonal",
   seams: (t) => {
-    const k = progress(t, 0, 179, ease.inOut);
+    const k = progress(t, 0, frames - 1, ease.inOut);
     return [lerp(R.seamsFrom[0], R.seamsTo[0], k), lerp(R.seamsFrom[1], R.seamsTo[1], k)];
   },
   clayColor: "#b9b4ab",
   wireColor: "#bcd8ff",
   wireBackground: "#24324a",
-};
+});
 
 /* ------------------------------ props ------------------------------ */
 
@@ -184,24 +185,30 @@ const Shot: React.FC = () => {
   return null;
 };
 
-export const RenderPassScene: React.FC<{ durationInFrames: number }> = () => (
-  <AbsoluteFill>
-    <Stage background="#1a1918" film={{ dof: false, bloom: 0.12, halation: 0.12, grain: 0.22, vignette: 0.2 }}>
-      <Shot />
-      <Fog color="#1a1918" near={2.2} far={5} />
-      <KeyLight kind="softbox" temp={4800} intensity={5.5} position={[-1.0, 1.6, 0.9]} target={[0, 0.04, 0]} angle={30} shadowRadius={9} />
-      <Bounce from="wall" temp={7000} intensity={0.45} position={[1.4, 0.5, 0.6]} />
-      <SkyFill temp={9000} intensity={0.3} />
-      <StudioEnv intensity={0.35} />
-      <Room />
-      <group position={[0.06, 0, 0.14]} rotation-y={-0.25}>
-        <Sampler />
-      </group>
-      <group position={[-0.04, 0, -0.17]} rotation-y={0.18}>
-        <CassetteDeck />
-      </group>
-      <RenderPass {...splitSpec} />
-    </Stage>
-    <PassLabels spec={splitSpec} labels={R.labels} />
-  </AbsoluteFill>
-);
+export const RenderPassScene: React.FC<{ durationInFrames: number }> = () => {
+  const { durationInFrames } = useVideoConfig();
+  const splitSpec = useMemo(() => makeSplitSpec(durationInFrames), [durationInFrames]);
+  return (
+    <AbsoluteFill>
+      <Stage background="#1a1918" film={{ dof: false, bloom: 0.12, halation: 0.12, grain: 0.22, vignette: 0.2 }}>
+        <Shot />
+        <Fog color="#1a1918" near={2.2} far={5} />
+        <KeyLight kind="softbox" temp={4800} intensity={5.5} position={[-1.0, 1.6, 0.9]} target={[0, 0.04, 0]} angle={30} shadowRadius={9} />
+        <Bounce from="wall" temp={7000} intensity={0.45} position={[1.4, 0.5, 0.6]} />
+        <SkyFill temp={9000} intensity={0.3} />
+        <StudioEnv intensity={0.35} />
+        <Room />
+        <group position={[0.06, 0, 0.14]} rotation-y={-0.25}>
+          <Sampler />
+        </group>
+        <group position={[-0.04, 0, -0.17]} rotation-y={0.18}>
+          <CassetteDeck />
+        </group>
+        <RenderPass {...splitSpec} />
+      </Stage>
+      <PassLabels spec={splitSpec} labels={R.labels} />
+    </AbsoluteFill>
+  );
+};
+
+export default RenderPassScene;

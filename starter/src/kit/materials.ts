@@ -146,6 +146,29 @@ export const glass = (tint = "#ffffff", roughness = 0.04) =>
     }),
   );
 
+/**
+ * Jelly / gummy: transmissive, tinted by depth, glossy clearcoat.
+ * `size` is the object's rough thickness in metres (sets transmission depth).
+ */
+export const jelly = (color: string, size = 0.1) =>
+  memo(`jelly:${color}:${size}`, () => {
+    const c = new THREE.Color(color);
+    return new THREE.MeshPhysicalMaterial({
+      color: c.clone().lerp(new THREE.Color("#ffffff"), 0.08),
+      roughness: 0.14,
+      transmission: 0.72,
+      thickness: size * 0.6,
+      ior: 1.38,
+      attenuationColor: c,
+      attenuationDistance: size * 0.5,
+      clearcoat: 1,
+      clearcoatRoughness: 0.05,
+      specularIntensity: 1,
+    });
+  });
+
+/** Fur is a component (many shells), not a single material: see `<Fur>` in kit/fur.tsx. */
+
 /** Matte paper / card. */
 export const paper = (color = "#e9e2d2") =>
   memo(`paper:${color}`, () =>

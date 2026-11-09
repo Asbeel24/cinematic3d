@@ -11,7 +11,8 @@ const root = projectRoot();
 const cfg = shotConfig(root);
 const format = arg("format", cfg.format);
 const compId = arg("comp", `${cfg.name}-${formatId(format)}`);
-const outDir = path.join(root, "review", compId);
+// the shot's default comp writes to review/, any other comp to review/<comp>/
+const outDir = compId === `${cfg.name}-${formatId(cfg.format)}` ? path.join(root, "review") : path.join(root, "review", compId);
 fs.mkdirSync(outDir, { recursive: true });
 
 const t0 = Date.now();

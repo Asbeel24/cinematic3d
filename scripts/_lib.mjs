@@ -74,3 +74,38 @@ export function arg(name, def) {
 }
 
 export const fmtMs = (ms) => (ms < 60000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.floor(ms / 60000)} min ${((ms % 60000) / 1000).toFixed(0)} s`);
+
+export const LOOKS = ["golden-hour", "render-pass", "jelly-type", "fur", "turntable"];
+
+/** Copy the reference Look scene into src/shot/Shot.tsx (the file Claude edits). */
+export function materializeLook(root, look) {
+  if (!LOOKS.includes(look)) throw new Error(`Unknown look "${look}". Choose one of: ${LOOKS.join(", ")}`);
+  const dir = path.join(root, "src", "scenes", look);
+  const file = fs.readdirSync(dir).find((f) => f.endsWith(".tsx"));
+  let src = fs.readFileSync(path.join(dir, file), "utf8");
+  src = src.replaceAll('"../../kit/', '"../kit/');
+  const header = `// Shot file, started from the "${look}" Look (src/scenes/${look}/${file}).\n// Edit freely: this is the only scene file of this shot. Keep the default export.\n`;
+  fs.mkdirSync(path.join(root, "src", "shot"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "shot", "Shot.tsx"), header + src);
+}
+
+/** Write src/shot.config.ts. */
+export function writeShotConfig(root, { name, look, format, sec, fps, seed }) {
+  fs.writeFileSync(
+    path.join(root, "src", "shot.config.ts"),
+    `// The current shot. scripts/new.mjs writes this file; Root.tsx registers src/shot/Shot.tsx
+// as \`<name>-9x16\`, \`<name>-16x9\` and \`<name>-1x1\`. stills.mjs / render.mjs default to \`<name>-<format>\`.
+export const shotConfig = {
+  name: "${name}",
+  /** the Look this shot was started from (${LOOKS.join(" | ")}) */
+  look: "${look}",
+  /** default format for stills/render: "9:16" | "16:9" | "1:1" */
+  format: "${format}" as "9:16" | "16:9" | "1:1",
+  sec: ${sec},
+  fps: ${fps} as 24 | 30,
+  /** master seed: add it to every rng()/noise seed in the shot so a re-roll is one edit */
+  seed: ${seed},
+};
+`,
+  );
+}
