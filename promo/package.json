@@ -1,0 +1,14 @@
+{
+  "name": "cinematic-3d-promo",
+  "private": true,
+  "type": "module",
+  "scripts": { "studio": "remotion studio src/index.ts" },
+  "dependencies": {
+    "@remotion/cli": "4.0.541",
+    "remotion": "4.0.541",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "@fontsource/noto-sans-sc": "^5.2.0",
+    "@fontsource/inter": "^5.3.0"
+  }
+}
