@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Create a new shot project from the starter.
 //   node <skill>/scripts/new.mjs <name> --look golden-hour --format 9:16 --sec 6 [--fps 30] [--seed 1] [--install]
+//   node <skill>/scripts/new.mjs <name> --example perfume     (start from a finished shot in <skill>/examples/)
 // Creates ./<name>/ with src/shot.config.ts and src/shot/Shot.tsx (a copy of the chosen Look).
 // Dependencies: if <skill>/starter/node_modules exists it is linked (fast, no download);
 // pass --install to run a fresh `npm install` in the new project instead.
@@ -17,11 +18,22 @@ if (!name || name.startsWith("--") || !/^[a-z0-9][a-z0-9-]*$/.test(name)) {
   console.error(`Usage: node scripts/new.mjs <name> --look <${LOOKS.join("|")}> --format 9:16|16:9|1:1 --sec 6\n(name: lowercase letters, digits, dashes)`);
   process.exit(1);
 }
-const look = String(arg("look", "golden-hour"));
-const format = String(arg("format", "9:16"));
-const sec = Number(arg("sec", 6));
-const fps = Number(arg("fps", 30));
-const seed = Number(arg("seed", 1));
+const exampleName = arg("example", false);
+let example = null;
+if (exampleName) {
+  const dir = path.join(skill, "examples", String(exampleName));
+  if (!fs.existsSync(path.join(dir, "example.json"))) {
+    const list = fs.readdirSync(path.join(skill, "examples")).filter((d) => fs.existsSync(path.join(skill, "examples", d, "example.json")));
+    console.error(`no example "${exampleName}". Available: ${list.join(", ")}`);
+    process.exit(1);
+  }
+  example = { dir, ...JSON.parse(fs.readFileSync(path.join(dir, "example.json"), "utf8")) };
+}
+const look = String(arg("look", example?.look ?? "golden-hour"));
+const format = String(arg("format", example?.format ?? "9:16"));
+const sec = Number(arg("sec", example?.sec ?? 6));
+const fps = Number(arg("fps", example?.fps ?? 30));
+const seed = Number(arg("seed", example?.seed ?? 1));
 if (!LOOKS.includes(look)) fail(`--look must be one of ${LOOKS.join(", ")}`);
 if (!["9:16", "16:9", "1:1"].includes(format)) fail("--format must be 9:16, 16:9 or 1:1");
 if (!(sec > 0 && sec <= 30)) fail("--sec must be between 0 and 30");
@@ -41,6 +53,7 @@ fs.cpSync(starter, dest, {
 });
 writeShotConfig(dest, { name, look, format, sec, fps, seed });
 materializeLook(dest, look);
+if (example) fs.copyFileSync(path.join(example.dir, "Shot.tsx"), path.join(dest, "src", "shot", "Shot.tsx"));
 
 const shared = path.join(starter, "node_modules");
 if (!arg("install", false) && fs.existsSync(shared)) {

@@ -3,3 +3,4 @@ out/
 review/
 *.log
 out-*.log
+dist/

@@ -1,0 +1,8 @@
+{
+  "prompt": "一台复古收音机做 render pass 展示，标签用中文\"成片 / 白模 / 线框\"，竖屏 6 秒。",
+  "look": "render-pass",
+  "format": "9:16",
+  "sec": 6.0,
+  "fps": 30,
+  "seed": 1
+}

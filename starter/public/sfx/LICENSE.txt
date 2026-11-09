@@ -1,0 +1,2 @@
+These sound effects were synthesised from code by scripts/sfx.mjs (no samples or recordings).
+They are dedicated to the public domain under CC0 1.0: https://creativecommons.org/publicdomain/zero/1.0/

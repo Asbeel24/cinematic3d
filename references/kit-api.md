@@ -303,6 +303,20 @@ useShot({ lens: 85, frame: { center: [0, 0.145, 0], size: [0.05, 0.05, 0.03], fi
 
 ---
 
+## sound.tsx（可选声音）
+
+音效在 `public/sfx/`，由 `scripts/sfx.mjs` 合成（原创，CC0）：`thud`（重物落地）、`pop`（果冻落地）、`boing`（弹簧）、`tick`（滴答）、`whoosh`（1 s 风声，峰值在 0.55 s，转场 / 揭示）、`chime`（铃，标题出现）、`wind`、`room`（4 s，可循环的环境声）。
+**放在 `<Stage>` 外面**（Stage 里面是 3D 画布）：`<><Stage>…</Stage><Sfx … /></>`。
+
+| 组件 / 函数 | 说明 |
+| --- | --- |
+| `<Sfx name at volume? pitch? />` | 第 `at` 帧开始播一次。`volume` 默认 0.8；`pitch` 0.5–2（速度和音高一起变，连续几声时逐个 +0.05–0.1 更有趣） |
+| `<Bed name volume? fadeIn? fadeOut? />` | 整条镜头循环播放，默认音量 0.35，淡入 12 帧、淡出 18 帧 |
+| `beats(bpm, fps, count, offset?)` | 返回节拍所在的帧号数组。动画卡点：第 i 个动作在 `beats(...)[i]` 帧发生，`<Sfx>` 放同一帧 |
+
+动作和声音对齐：声音放在**接触 / 峰值那一帧**（落地帧、阵风峰值），不是动作开始的那帧。`whoosh` 的峰值在 0.55 s，所以 `at = 峰值帧 − 0.55 × fps`。
+渲染时声音会自动混进 MP4（AAC）；联系表和 stills 没有声音。
+
 ## fonts.tsx
 
 `FONTS = { ui: "Inter", round: "Fredoka" }`。`<FontGate>` 由 `Root.tsx` 自动包住每个镜头，字体加载完才开始渲染。

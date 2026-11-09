@@ -1,3 +1,4 @@
+import { Sfx } from "../../kit/sound";
 import React, { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useVideoConfig } from "remotion";
@@ -26,6 +27,8 @@ export const JELLY = {
   firstHit: 24,
   /** squash depth on impact (0.2–0.4) */
   squash: 0.32,
+  /** a pop on every landing (kit/sound, CC0). false = silent */
+  sound: true,
   /** do not edit */
   size: 0.115,
   drop: 0.9,
@@ -185,7 +188,17 @@ const ShotCamera: React.FC<{ position: Vec3; target: Vec3; push: Vec3 }> = ({ po
   return null;
 };
 
+const Sounds: React.FC = () => (
+  <>
+    {Array.from(J.word).map((_, i) => (
+      <Sfx key={i} name="pop" at={J.firstHit + i * J.stagger} volume={0.7} pitch={0.9 + 0.08 * i} />
+    ))}
+  </>
+);
+
 export const JellyType: React.FC<{ durationInFrames: number }> = () => (
+  <>
+  {J.sound && <Sounds />}
   <Stage background={J.floor} film={{ dof: true, bloom: 0.18, halation: 0.12, grain: 0.18, vignette: 0.18, exposure: 0.8 }}>
     <Shot />
     <Fog color={J.floor} near={2.4} far={6} />
@@ -196,6 +209,7 @@ export const JellyType: React.FC<{ durationInFrames: number }> = () => (
     <Sweep />
     <Letters />
   </Stage>
+  </>
 );
 
 export default JellyType;

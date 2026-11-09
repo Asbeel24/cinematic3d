@@ -35,6 +35,8 @@ description: 一句话镜头描述 → 本地 three.js 场景 → 自检关键�
 
 需求不在五个 Look 里时，选灯光和镜头语言最接近的那个，换主体。不要从零写场景。
 
+**先看 `examples/`**：9 条做好的镜头，每个目录的 `example.json` 有原始 prompt（音箱 AURA、香水、手表、书 + 眼镜、深夜台灯书桌、收音机分屏、HELLO 果冻字、阵风毛绒球、雪地耳罩）。需求和某条很像时，用 `new.mjs <name> --example <example>` 从它开始，比从 Look 改省好几轮。
+
 ### ② 镜头方案（闸门 1）
 动手前先给用户一份 **≤ 8 行**的方案，等确认：
 
@@ -154,6 +156,8 @@ node <skill>/scripts/render.mjs --final --format 1:1   # 另一个画幅
 | `references/review-checklist.md` | 每次 stills 之后 |
 | `references/troubleshooting.md` | 报错、黑帧、闪烁、渲染慢 |
 | `PROMPTS.md` | 用户没想法时给他挑 |
+| `examples/*/example.json` | 选起点时，看有没有现成的相似镜头 |
+| `README.md` → 声音 | 用户要音效 / 卡点时（`kit/sound.tsx`：`<Sfx>`、`<Bed>`、`beats()`） |
 
 ## 交付格式
 
