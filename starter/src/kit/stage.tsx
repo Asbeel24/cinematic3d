@@ -21,6 +21,7 @@ import {
   VignetteEffect,
 } from "postprocessing";
 import { ExposureEffect, GrainEffect, HalationEffect } from "./post";
+import { SplitPass, type SplitSpec } from "./renderPass";
 
 /* ------------------------------------------------------------------ */
 /* Timeline: every animated value is a pure function of t (in frames). */
@@ -36,6 +37,8 @@ export type StageState = {
   focus: { enabled: boolean; distance: number; range: number; bokeh: number };
   /** frame ranges that need more motion-blur sub-samples (e.g. whip pans) */
   blurWindows: { from: number; to: number; samples: number }[];
+  /** render-pass split screen (see renderPass.tsx) */
+  split: SplitSpec | null;
   /** set by the driver: false in proxy mode (no motion blur) */
   proxy: boolean;
 };
@@ -64,6 +67,18 @@ export function useTimeline(fn: TimelineFn, order = 0) {
       timeline.delete(e);
     };
   }, [timeline]);
+}
+
+/** Raise motion-blur sub-samples for a frame range (fast action). Proxy renders ignore it. */
+export function useMotionBlur(from: number, to: number, samples = 8) {
+  const { blurWindows } = useStage();
+  useLayoutEffect(() => {
+    const w = { from, to, samples };
+    blurWindows.push(w);
+    return () => {
+      blurWindows.splice(blurWindows.indexOf(w), 1);
+    };
+  }, [blurWindows, from, to, samples]);
 }
 
 function runTimeline(state: StageState, t: number) {
@@ -217,6 +232,8 @@ const Driver: React.FC<{
     const composer = new EffectComposer(gl, { frameBufferType: THREE.HalfFloatType });
     const sub = new SubframePass(scene, camera, state);
     composer.addPass(sub);
+    const split = new SplitPass(scene, camera);
+    composer.addPass(split);
 
     const exposure = new ExposureEffect(film.exposure);
     let dof: DepthOfFieldEffect | null = null;
@@ -243,7 +260,7 @@ const Driver: React.FC<{
         d.bokehScale = state.focus.enabled ? state.focus.bokeh : 0;
       };
     }
-    return { composer, sub, grain, dof };
+    return { composer, sub, grain, dof, split };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gl, scene, camera]);
 
@@ -262,8 +279,23 @@ const Driver: React.FC<{
     pipeline.sub.samples = n;
     pipeline.sub.shutter = shutterAngle / 360;
     pipeline.grain.setFrame(f);
+    pipeline.split.enabled = !!state.split;
+    pipeline.split.spec = state.split;
+    pipeline.split.frame = f;
     pipeline.composer.render(0);
   }, 1);
+  return null;
+};
+
+/** Distance fog in the background colour: dissolves floors into the horizon. */
+export const Fog: React.FC<{ color: string; near: number; far: number }> = ({ color, near, far }) => {
+  const scene = useThree((s) => s.scene);
+  useLayoutEffect(() => {
+    scene.fog = new THREE.Fog(color, near, far);
+    return () => {
+      scene.fog = null;
+    };
+  }, [scene, color, near, far]);
   return null;
 };
 
@@ -292,6 +324,7 @@ export const Stage: React.FC<StageProps> = ({
       timeline: new Set(),
       focus: { enabled: false, distance: 3, range: 1, bokeh: 0 },
       blurWindows: [],
+      split: null,
       proxy,
     }),
     [proxy],

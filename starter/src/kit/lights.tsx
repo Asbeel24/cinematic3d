@@ -53,7 +53,7 @@ export function makeGoboTexture(g: GoboSpec): THREE.CanvasTexture {
   const S = 1024;
   const src = document.createElement("canvas");
   src.width = src.height = S;
-  const c = src.getContext("2d")!;
+  const c = src.getContext("2d", { willReadFrequently: true })!;
   c.fillStyle = "#000";
   c.fillRect(0, 0, S, S);
   const [ax0, ay0, ax1, ay1] = g.aperture ?? [0.18, 0.12, 0.82, 0.88];
@@ -105,7 +105,7 @@ export function makeGoboTexture(g: GoboSpec): THREE.CanvasTexture {
   // soft edges: blur the whole pattern (penumbra of a large source)
   const out = document.createElement("canvas");
   out.width = out.height = S;
-  const o = out.getContext("2d")!;
+  const o = out.getContext("2d", { willReadFrequently: true })!;
   o.filter = `blur(${g.softness ?? 6}px)`;
   o.drawImage(src, 0, 0);
   const tex = new THREE.CanvasTexture(out);

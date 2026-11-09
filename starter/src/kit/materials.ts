@@ -13,8 +13,9 @@ function memo<T extends THREE.Material | THREE.Texture>(key: string, make: () =>
 
 function canvas(size: number, draw: (c: CanvasRenderingContext2D, s: number) => void, srgb = true) {
   const el = document.createElement("canvas");
+  // willReadFrequently forces the CPU rasteriser: GPU canvas text can differ by ±1 between runs
   el.width = el.height = size;
-  draw(el.getContext("2d")!, size);
+  draw(el.getContext("2d", { willReadFrequently: true })!, size);
   const t = new THREE.CanvasTexture(el);
   t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;

@@ -11,7 +11,7 @@ const root = projectRoot();
 const cfg = shotConfig(root);
 const format = arg("format", cfg.format);
 const compId = arg("comp", `${cfg.name}-${formatId(format)}`);
-const outDir = path.join(root, "review");
+const outDir = path.join(root, "review", compId);
 fs.mkdirSync(outDir, { recursive: true });
 
 const t0 = Date.now();
@@ -39,15 +39,21 @@ for (const f of frames) {
   const img = decodePNG(fs.readFileSync(file));
   const raw = img.data;
   tiles.push(resize(img, 720));
-  let sum = 0, hi = 0, lo = 0;
-  const n = raw.length / 3;
-  for (let i = 0; i < raw.length; i += 3) {
-    const y = 0.2126 * raw[i] + 0.7152 * raw[i + 1] + 0.0722 * raw[i + 2];
-    sum += y;
-    if (y >= 250) hi++;
-    if (y <= 4) lo++;
-  }
-  const s = { frame: f, file: path.relative(root, file), renderMs: ms, meanLuma: +(sum / n / 255).toFixed(4), clippedHighlights: +((hi / n) * 100).toFixed(3), crushedBlacks: +((lo / n) * 100).toFixed(3) };
+  // clipping / crushing are judged on 4×4 block means, so film grain alone never counts as "dead black"
+  let sum = 0, hi = 0, lo = 0, nb = 0;
+  const n = raw.length / 3, W = img.width, B = 4;
+  const luma = (i) => 0.2126 * raw[i] + 0.7152 * raw[i + 1] + 0.0722 * raw[i + 2];
+  for (let i = 0; i < raw.length; i += 3) sum += luma(i);
+  for (let by = 0; by + B <= img.height; by += B)
+    for (let bx = 0; bx + B <= W; bx += B) {
+      let m = 0;
+      for (let y = 0; y < B; y++) for (let x = 0; x < B; x++) m += luma(((by + y) * W + bx + x) * 3);
+      m /= B * B;
+      nb++;
+      if (m >= 250) hi++;
+      if (m <= 4) lo++;
+    }
+  const s = { frame: f, file: path.relative(root, file), renderMs: ms, meanLuma: +(sum / n / 255).toFixed(4), clippedHighlights: +((hi / nb) * 100).toFixed(3), crushedBlacks: +((lo / nb) * 100).toFixed(3) };
   s.pass = s.clippedHighlights < 1 && s.crushedBlacks < 3;
   stats.frames.push(s);
   files.push(file);
